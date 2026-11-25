@@ -58,7 +58,7 @@ WAKE_WAIT = 10 * 60          # give a woken car this long to come online, then g
 ONLINE_STREAK_NEEDED = 2     # consecutive online state checks before we touch the car
 # Tesla gives each developer account a $10/month credit: stay under it and the bill is $0.
 MONTHLY_BUDGET = 8.00        # estimated $ per calendar month; polling stops when reached
-PRICE = {"vehicle": 1 / 500, "vehicle_data": 1 / 500, "charging_history": 1 / 500, "wake_up": 1 / 50}
+PRICE = {"vehicle": 1 / 500, "vehicle_data": 1 / 500, "extras": 1 / 500, "charging_history": 1 / 500, "wake_up": 1 / 50}
 NEARBY_EVERY = 3600          # nearby Superchargers: at most hourly, and only when a read shows the car awake  # $ per call, Tesla's list prices
 
 LOW_BATTERY_PCT = 20
@@ -529,8 +529,8 @@ class Poller:
         self.set_mode(mode)
         if drive_ended:
             self.sync_alerts()
-        r2 = self.db.execute("SELECT value FROM settings WHERE key='nearby'").fetchone()
-        if not r2 or now - json.loads(r2[0]).get("ts", 0) >= NEARBY_EVERY:
+        r2 = self.db.execute("SELECT value FROM settings WHERE key='nearby_tried'").fetchone()
+        if not r2 or now - json.loads(r2[0]) >= NEARBY_EVERY:
             try:
                 extras.sync_nearby(self.api, self.db, VIN)     # the car is awake right now anyway
             except Exception:  # noqa: BLE001
@@ -580,6 +580,7 @@ class Poller:
                 self.event("supercharging", f"Supercharger history synced: {n} new session(s)")
         except Exception:  # noqa: BLE001 - never let this stop polling
             log.exception("supercharger sync failed")
+            extras._setting(self.db, "sc_last_sync", time.time())   # retry tomorrow, not every loop
 
     def sync_alerts(self):
         """recent_alerts keeps only the last dozen: store them, email faults / 'service required'."""
@@ -614,6 +615,7 @@ class Poller:
                            + (f", software updated to {out['new_version']}" if out["new_version"] else ""))
         except Exception:  # noqa: BLE001
             log.exception("extras sync failed")
+            extras._setting(self.db, "extras_last_sync", time.time())   # retry tomorrow, not every loop
 
     def step(self) -> float:
         """Do one action, return seconds until the next one."""

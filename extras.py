@@ -48,7 +48,7 @@ def _setting(c, key, value=None):
 
 
 def _get(api, vin, path):
-    code, body = api.request(f"/api/1/vehicles/{vin}/{path}", "vehicle_data")
+    code, body = api.request(f"/api/1/vehicles/{vin}/{path}", "extras")   # billed as a data request
     return (body or {}).get("response") if code == 200 else None
 
 
@@ -114,6 +114,7 @@ def sync_daily(api, c: sqlite3.Connection, vin: str) -> dict:
 
 
 def sync_nearby(api, c: sqlite3.Connection, vin: str):
+    _setting(c, "nearby_tried", time.time())   # a failed try waits NEARBY_EVERY too, never once per read
     r = _get(api, vin, "nearby_charging_sites")
     if r is not None:
         _setting(c, "nearby", {"ts": time.time(), "data": r})
