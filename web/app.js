@@ -91,7 +91,7 @@ async function refreshStatus() {
   $("#carSub").textContent = [d.car_type === "modelx" ? "Model X" : d.car_type, d.trim, d.software].filter(Boolean).join(" · ");
   const c = s.car || {};
   const awake = s.state === "online";
-  setLed("#ledAwake", s.waking ? "amber" : awake ? "ok" : "", s.waking ? "Waking…" : awake ? (s.mode === "driving" ? "Driving" : s.mode === "charging" ? "Charging" : "Awake") : s.state === "asleep" ? "Asleep" : (s.state || "Unknown"));
+  setLed("#ledAwake", s.waking ? "amber" : awake ? "ok" : s.state === "asleep" ? "sleep" : "", s.waking ? "Waking…" : awake ? (s.mode === "driving" ? "Driving" : s.mode === "charging" ? "Charging" : "Awake") : s.state === "asleep" ? "Asleep" : (s.state || "Unknown"));
   setLed("#ledLock", c.locked === 0 || c.locked === false ? "err" : c.locked ? "ok" : "", c.locked === 0 || c.locked === false ? "Unlocked" : c.locked ? "Locked" : "Lock ?");
   const plugged = c.charging_state && c.charging_state !== "Disconnected";
   const charging = ["Charging", "Starting"].includes(c.charging_state);

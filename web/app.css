@@ -52,6 +52,7 @@ nav.tabs a.on { color: var(--t-accent); background: color-mix(in srgb, var(--t-a
 .led.ok i { background: var(--t-ok); box-shadow: 0 0 6px color-mix(in srgb, var(--t-ok) 70%, transparent); }
 .led.amber i { background: var(--t-accent); box-shadow: 0 0 6px color-mix(in srgb, var(--t-accent) 70%, transparent); }
 .led.err i { background: var(--t-err); box-shadow: 0 0 6px color-mix(in srgb, var(--t-err) 70%, transparent); }
+.led.sleep i { background: #6f9bd1; box-shadow: 0 0 6px rgba(111,155,209,.6); }   /* asleep: a state, not a fault */
 
 main { padding: var(--s-4); max-width: 1500px; margin: 0 auto; }
 section.view { display: none; } section.view.on { display: block; }
