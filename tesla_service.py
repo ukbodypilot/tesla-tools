@@ -490,7 +490,7 @@ class Poller:
     def set_mode(self, mode: str):
         if mode != self.mode:
             log.info("mode %s -> %s", self.mode, mode)
-            if not (self.mode == "unknown" and mode == "online"):
+            if self.mode != "unknown":          # "unknown" = just started: not a real change
                 self.event("mode", f"{self.mode} → {mode}")
         self.mode = mode
         for m in ("asleep", "online", "parked", "driving", "charging", "unknown"):
