@@ -95,7 +95,8 @@ async function refreshStatus() {
   setLed("#ledLock", c.locked === 0 || c.locked === false ? "err" : c.locked ? "ok" : "", c.locked === 0 || c.locked === false ? "Unlocked" : c.locked ? "Locked" : "Lock ?");
   const plugged = c.charging_state && c.charging_state !== "Disconnected";
   const charging = ["Charging", "Starting"].includes(c.charging_state);
-  setLed("#ledPlug", charging ? "amber" : plugged ? "ok" : "", charging ? "Charging" : plugged ? "Plugged in" : "Unplugged");
+  setLed("#ledPlug", charging ? "amber" : plugged ? "ok" : "", charging ? "Charging" : "Plugged");
+  $("#ledPlug").title = charging ? "Charging" : plugged ? "Plugged in" : "Not plugged in";
   return s;
 }
 function setLed(sel, cls, text) { const el = $(sel); el.className = "led " + cls; $("span", el).textContent = text; }
