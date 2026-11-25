@@ -35,6 +35,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))  # -I drops the script dir
 import charging  # noqa: E402
 import config  # noqa: E402
+import extras  # noqa: E402
 import supercharger  # noqa: E402
 import webapp  # noqa: E402
 
@@ -57,7 +58,8 @@ WAKE_WAIT = 10 * 60          # give a woken car this long to come online, then g
 ONLINE_STREAK_NEEDED = 2     # consecutive online state checks before we touch the car
 # Tesla gives each developer account a $10/month credit: stay under it and the bill is $0.
 MONTHLY_BUDGET = 8.00        # estimated $ per calendar month; polling stops when reached
-PRICE = {"vehicle": 1 / 500, "vehicle_data": 1 / 500, "charging_history": 1 / 500, "wake_up": 1 / 50}  # $ per call, Tesla's list prices
+PRICE = {"vehicle": 1 / 500, "vehicle_data": 1 / 500, "charging_history": 1 / 500, "wake_up": 1 / 50}
+NEARBY_EVERY = 3600          # nearby Superchargers: at most hourly, and only when a read shows the car awake  # $ per call, Tesla's list prices
 
 LOW_BATTERY_PCT = 20
 LOW_BATTERY_HOUR = 21        # local hour after which an unplugged low battery is emailed
@@ -66,7 +68,7 @@ TYRE_SPREAD_BAR = 0.35       # one tyre this far below the highest
 PACK_KWH = 95.0              # usable pack size for the efficiency estimate (2019 X 100D)
 HOME_RATE = 0.24             # home electricity $/kWh, for "what if we had charged at home"
 HOME_LOSS_PCT = 10.0         # wall-to-battery loss charging at home: wall kWh = battery kWh / (1 - loss)
-ALERT_ON = {"unlocked": True, "tyre": True, "battery": True, "budget": True, "broken": True}
+ALERT_ON = {"unlocked": True, "tyre": True, "battery": True, "car_alert": True, "budget": True, "broken": True}
 UNITS = {"distance": "mi", "pressure": "psi", "temp": "F"}
 
 # Settings the web app may change: name -> (kind, min, max, scale to stored unit, label, group, help).
@@ -175,6 +177,7 @@ def db() -> sqlite3.Connection:
     CREATE TABLE IF NOT EXISTS events(ts INTEGER, kind TEXT, message TEXT);
     CREATE TABLE IF NOT EXISTS web_sessions(token TEXT PRIMARY KEY, created INTEGER, ip TEXT);
     CREATE INDEX IF NOT EXISTS reads_ts ON reads(ts);
+    """ + extras.SCHEMA + """
     CREATE INDEX IF NOT EXISTS states_ts ON states(ts);
     """)
     if "dollars" not in [r[1] for r in c.execute("PRAGMA table_info(usage)")]:
@@ -522,7 +525,16 @@ class Poller:
         self.db.commit()
         self.last, self.last_read_ts, self.read_this_wake = f, now, True
         self.export(f, now)
+        drive_ended = self.mode == "driving" and mode != "driving"
         self.set_mode(mode)
+        if drive_ended:
+            self.sync_alerts()
+        r2 = self.db.execute("SELECT value FROM settings WHERE key='nearby'").fetchone()
+        if not r2 or now - json.loads(r2[0]).get("ts", 0) >= NEARBY_EVERY:
+            try:
+                extras.sync_nearby(self.api, self.db, VIN)     # the car is awake right now anyway
+            except Exception:  # noqa: BLE001
+                log.exception("nearby sync failed")
         self.check_car_alerts(f)
 
     # alerts that need a fresh read --------------------------------------
@@ -569,9 +581,44 @@ class Poller:
         except Exception:  # noqa: BLE001 - never let this stop polling
             log.exception("supercharger sync failed")
 
+    def sync_alerts(self):
+        """recent_alerts keeps only the last dozen: store them, email faults / 'service required'."""
+        first = self.db.execute("SELECT COUNT(*) FROM car_alerts").fetchone()[0] == 0
+        try:
+            new = extras.sync_alerts(self.api, self.db, VIN)
+        except Exception:  # noqa: BLE001
+            log.exception("alert sync failed")
+            return
+        if first:                       # seeding: alerts from before we started are history, not news
+            if new:
+                self.event("alert", f"Car alert history: {len(new)} recent alert(s) saved")
+            return
+        for a in new:
+            self.event("alert", f"Car alert: {a['user_text'] or a['name']} ({a['name']})")
+            if extras.needs_service(a["name"], a["user_text"]) and time.time() - a["ts"] < 7 * 86400:
+                when = dt.datetime.fromtimestamp(a["ts"]).strftime("%a %d %b %H:%M")
+                self.mail.send("car_alert", f"{a['name']}:{a['ts']}", f"Car alert: {a['user_text'] or a['name']}",
+                               f"The car reported at {when}:\n\n  {a['user_text'] or '(no message)'}\n  code {a['name']}\n\n"
+                               "If the car shows 'Service is required', book a service visit in the Tesla app.")
+
+    def maybe_sync_extras(self, force=False):
+        """Alerts, service visits, software, drivers: once a day (about 5 requests)."""
+        r = self.db.execute("SELECT value FROM settings WHERE key='extras_last_sync'").fetchone()
+        if not force and r and time.time() - json.loads(r[0]) < 86400:
+            return
+        self.sync_alerts()
+        try:
+            out = extras.sync_daily(self.api, self.db, VIN)
+            if out["visits_new"] or out["new_version"] or force:
+                self.event("service", f"Service/software synced: {out['visits_new']} new visit(s)"
+                           + (f", software updated to {out['new_version']}" if out["new_version"] else ""))
+        except Exception:  # noqa: BLE001
+            log.exception("extras sync failed")
+
     def step(self) -> float:
         """Do one action, return seconds until the next one."""
         self.maybe_sync_supercharging()
+        self.maybe_sync_extras()
         if self.mode in ("driving", "charging"):
             self.read_car()
             if self.mode == "driving":
@@ -662,6 +709,9 @@ class Poller:
                 return DRIVING_EVERY if self.mode == "driving" else \
                     CHARGING_EVERY if self.mode == "charging" else STATE_EVERY
             self.event("manual", f"Read now: car is {st or 'unreachable'}, left alone (not woken)")
+            return None
+        if action == "extras_sync":
+            self.maybe_sync_extras(force=True)
             return None
         if action == "sc_sync":
             self.maybe_sync_supercharging(force=True)

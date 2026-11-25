@@ -102,6 +102,34 @@ for i in range(70):
         s["fees"].append({"feeType": "PARKING", "pricingType": "PAYMENT", "rateBase": 0.5, "usageBase": 6,
                           "uom": "min", "totalDue": 3.0})
     c.execute("INSERT INTO sc_sessions VALUES(?,?,?)", (str(s["sessionId"]), s["chargeStartDateTime"], json.dumps(s)))
+# alerts, service visits, software, nearby Superchargers
+for i, (name, text) in enumerate([("APP_w207_autosteerUnavailable", "Autosteer temporarily unavailable"),
+                                  ("DI_u006_driverLeft", "Vehicle automatically parked to prevent rollaway"),
+                                  ("TPMS_w005_softWarning", "Tire pressure low / Check tire pressure"),
+                                  ("UMC_f041_chargeFault", "Charging stopped / Charging equipment fault"),
+                                  ("GTW_w290_parkAssistTempFailure", "Park Assist unavailable")]):
+    c.execute("INSERT INTO car_alerts VALUES(?,?,?,?,?)", (name, int(now - (i * 2.3 + 0.4) * 86400), text, "[]", int(now)))
+for vid, date, kind, where, work, total in [
+        ("101", "2026-09-03", "service_center", "Tesla Service Demo City",
+         [("Front Suspension Noise Diagnosis", "customer_pay"), ("Control Arm - Upper - Front - Pair (Remove and Replace)", "customer_pay"),
+          ("Four Wheel Alignment Check and Adjust", "customer_pay")], 1180.40),
+        ("102", "2026-03-15", "mobile", "Mobile Service Demo City",
+         [("Battery - 12V (Remove & Replace)", "customer_pay"), ("Automated Tire Pressure Check", "other")], 296.25),
+        ("103", "2025-06-02", "service_center", "Tesla Service Demo City",
+         [("HV Battery Coolant Check", "warranty"), ("General Diagnosis", "goodwill")], 0.0)]:
+    summ = {"service_visit_id": vid, "status": "delivered", "visit_type": kind, "checked_in_at": date + "T15:00:00Z",
+            "completed_at": date + "T22:00:00Z", "location": {"name": where}}
+    det = {**summ, "work_items": [{"description": d, "pay_type": pt} for d, pt in work],
+           "cost": {"currency": "USD", "total": total, "paid": total, "due": 0}}
+    c.execute("INSERT INTO service_visits VALUES(?,?,?,?)", (vid, json.dumps(summ), json.dumps(det), int(now)))
+c.execute("INSERT INTO software VALUES(?,?,?)", ("2026.38.6", int(now - 9 * 86400), json.dumps([
+    {"title": "Supercharger Site Maps", "description": "See a detailed view of select Superchargers, with live stall occupancy."},
+    {"title": "Security Improvements", "description": "This update includes important security fixes and improvements."}])))
+c.execute("INSERT INTO settings VALUES('nearby', ?)", (json.dumps({"ts": now - 1800, "data": {"superchargers": [
+    {"name": "San Francisco, CA - Folsom Street", "location": {"lat": 37.7716, "long": -122.4105}, "distance_miles": 0.9, "available_stalls": 7, "total_stalls": 12, "site_closed": False},
+    {"name": "San Francisco, CA - Mission Bay", "location": {"lat": 37.7699, "long": -122.3916}, "distance_miles": 1.8, "available_stalls": 0, "total_stalls": 8, "site_closed": False},
+    {"name": "Daly City, CA", "location": {"lat": 37.7046, "long": -122.4697}, "distance_miles": 4.6, "available_stalls": 11, "total_stalls": 16, "site_closed": False}]}}),))
+c.execute("INSERT INTO settings VALUES('extras_last_sync', ?)", (json.dumps(now - 3600),))
 ts.add_event(c, "wake", "no reading for 24 h: sent wake_up (HTTP 200)")
 c.execute("INSERT INTO settings VALUES('sc_last_sync', ?)", (json.dumps(now),))
 c.commit()

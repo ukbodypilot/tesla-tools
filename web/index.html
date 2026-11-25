@@ -8,7 +8,7 @@
   <div class="brand"><b id="carName">Tesla</b><span id="carSub"></span></div>
   <nav class="tabs" aria-label="Tesla sections">
     <a href="#dash" data-v="dash">Dashboard</a><a href="#trips" data-v="trips">Trips</a>
-    <a href="#charging" data-v="charging">Charging</a><a href="#supercharging" data-v="supercharging">Supercharging</a><a href="#battery" data-v="battery">Battery</a>
+    <a href="#charging" data-v="charging">Charging</a><a href="#supercharging" data-v="supercharging">Supercharging</a><a href="#battery" data-v="battery">Battery</a><a href="#service" data-v="service">Alerts &amp; Service</a>
     <a href="#activity" data-v="activity">Activity</a><a href="#settings" data-v="settings">Settings</a>
   </nav>
   <div class="leds" aria-live="polite">
@@ -50,6 +50,7 @@
       </div>
       <div class="panel"><h3>Tyres</h3><div class="tyres" id="tyres"></div></div>
       <div class="panel"><h3>Car settings <span class="mute" style="text-transform:none;letter-spacing:0">(as last read, view only)</span></h3><dl class="kv" id="kvCar"></dl></div>
+      <div class="panel" id="nearbyPanel" style="display:none"><h3>Nearby Superchargers <span class="mute" id="nearbyAge" style="text-transform:none;letter-spacing:0"></span></h3><div id="nearbyList"></div></div>
       <div class="panel"><h3>Tesla API spend this month</h3>
         <div class="readouts"><div class="ro"><div class="lbl">Spent</div><div class="val" id="roSpend">-.--</div></div>
           <div class="ro"><div class="lbl">Stops at</div><div class="val dimmed" id="roCap">-.--</div></div></div>
@@ -117,6 +118,24 @@
     <div class="panel"><h3>Battery lost while parked (% per day)</h3><div class="chart" id="drainChart"></div></div>
     <div class="panel"><h3>Time awake (% of checks)</h3><div class="chart" id="awakeChart"></div>
       <p class="mute" style="font-size:12px;margin:6px 0 0">A car that stays awake drains its battery. Sentry Mode keeps it at 100%.</p></div>
+  </div>
+</section>
+
+<!-- ============ ALERTS & SERVICE ============ -->
+<section class="view" id="v-service">
+  <div class="grid tiles" id="svcTiles"></div>
+  <div class="panel"><h3>Car alerts</h3>
+    <div class="filters" id="alertFilters"></div>
+    <div class="tablewrap scroll" id="alertTable"></div>
+    <p class="mute" style="font-size:12px;margin:8px 0 0">Tesla only keeps the car's last dozen or so alerts, so each one is saved here as it is seen (daily and after every drive).
+      An email goes out for new faults and anything that says service is required.</p></div>
+  <div class="spacer"></div>
+  <div class="panel"><h3>Service visits</h3><div class="tablewrap" id="visitTable"></div></div>
+  <div class="spacer"></div>
+  <div class="grid cols2">
+    <div class="panel"><h3>Software</h3><div id="swBox"></div></div>
+    <div class="panel"><h3>Access and service status</h3><dl class="kv" id="accessKv"></dl>
+      <div class="actions" style="margin-top:12px"><button class="rb" id="svcSync">Sync with Tesla now <span class="cost">~1¢</span></button><span class="mute" id="svcSynced"></span></div></div>
   </div>
 </section>
 

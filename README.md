@@ -13,7 +13,8 @@ something needs attention.
 
 - **Dashboard.** The car on a map with its track over the last 24 h, 7 or 30 days (street, dark or
   satellite maps). Battery and range readouts, the charge limit, tyre pressures, temperatures,
-  locks and openings, and the car's own settings (view only).
+  locks and openings, the car's own settings (view only), and nearby Superchargers with free
+  stalls (fetched only while the car is awake anyway).
 - **Trips.** Each drive with from → to, distance, battery used, an efficiency estimate (Wh/mi) and
   top speed. Click one to see its route.
 - **Charging.** Every charge longer than about half an hour: when, where, battery before → after,
@@ -25,15 +26,20 @@ something needs attention.
   home on your electricity rate, including charging losses.
 - **Battery.** Battery level over time, estimated range at 100% (a slow downward drift is battery
   wear), battery lost per day while parked, and how much of each day the car was awake.
+- **Alerts & Service.** The car's own alerts ("Autosteer unavailable", "Service is required", with
+  Tesla's internal code), kept permanently: Tesla only holds the last dozen. Every service visit
+  with the work done, who paid (you, warranty, goodwill) and the total, plus the installed and
+  waiting software, the release notes, and who the car is shared with.
 - **Activity.** Readings, wakes, button presses, alerts and settings changes in one feed.
 - **Email alerts.** Parked and unlocked, a low or uneven tyre, low battery and unplugged in the
-  evening, the monthly budget reached, or the poller failing for an hour.
+  evening, a new car fault or "service required" alert, the monthly budget reached, or the poller
+  failing for an hour.
 - **Prometheus metrics** at `/metrics`, plus an example Grafana dashboard in `grafana/`.
 
 | | |
 |---|---|
 | ![Supercharging savings per month, year and site](docs/screenshots/supercharging.png) | ![Trips with a route on the map](docs/screenshots/trips.png) |
-| ![Battery level, range at 100%, parked drain and time awake](docs/screenshots/battery.png) | ![Settings: polling, cost cap, alerts, units, remote access](docs/screenshots/settings.png) |
+| ![Battery level, range at 100%, parked drain and time awake](docs/screenshots/battery.png) | ![Alerts & Service: car alerts, service visits with work and cost](docs/screenshots/service.png) |
 
 ## How it avoids waking the car
 
@@ -59,7 +65,8 @@ battery used.
 Tesla charges per request (500 data requests or 50 wakes per $1) and gives each developer
 account a **$10 monthly credit**. tesla-tools counts every request at those list prices and stops
 for the rest of the month at a cap you set (default **$8**), paced day by day so it can't spend the
-whole budget early. A car that mostly sleeps costs about $3–4 a month in background checks. The
+whole budget early. A car that mostly sleeps costs about $3–4 a month in background checks, plus
+about 30¢ for the daily alerts, service, software and Supercharger-history syncs. The
 spend shown on the page is this estimate; your real bill is on Tesla's developer dashboard.
 Setting a small billing limit there as well is a good backstop.
 
@@ -147,6 +154,7 @@ contacts Tesla.
 | `tesla_service.py` | the poller: schedule, budget, alerts, metrics, the HTTP server |
 | `webapp.py` | the web page's API and access rules |
 | `analysis.py`, `charging.py`, `supercharger.py` | trips, battery, charging and Supercharger maths |
+| `extras.py` | car alerts, service visits, software, drivers, nearby Superchargers |
 | `web/` | the page (plain HTML/CSS/JS, Leaflet bundled) |
 | `login.py`, `register_partner.py` | one-off setup |
 | `config.py`, `config.example.toml` | install settings |

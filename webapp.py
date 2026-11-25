@@ -27,6 +27,7 @@ from http import cookies
 
 import analysis
 import charging
+import extras
 import supercharger
 
 log = logging.getLogger("tesla.web")
@@ -282,6 +283,10 @@ def handle(h, method: str):
             return _json(h, analysis.trips(svc.DB_PATH, min(float(q.get("days", 30)), 366), svc.PACK_KWH))
         if path == "/api/charging":
             return _json(h, charging.sessions(svc.DB_PATH))
+        if path == "/api/service":
+            return _json(h, extras.service_view(svc.DB_PATH))
+        if path == "/api/nearby":
+            return _json(h, extras.nearby_view(svc.DB_PATH))
         if path == "/api/supercharging":
             return _json(h, {**supercharger.summary(svc.DB_PATH, svc.HOME_RATE, svc.HOME_LOSS_PCT),
                              "home_rate_label": svc.CONF["home_rate_label"]})
@@ -330,7 +335,7 @@ def handle(h, method: str):
             return _json(h, {"ok": True}, extra={"Set-Cookie": f"{COOKIE}=; Max-Age=0; Path=/"})
         if path == "/api/action" and method == "POST":
             action = body.get("action")
-            if action not in ("read", "wake_read", "sc_sync"):
+            if action not in ("read", "wake_read", "sc_sync", "extras_sync"):
                 return _json(h, {"error": "unknown action"}, 400)
             poller.actions.put(action)
             poller.kick.set()

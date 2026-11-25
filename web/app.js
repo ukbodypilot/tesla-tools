@@ -38,7 +38,7 @@ const durFmt = (s) => { const m = Math.round(s / 60); return m >= 60 ? `${Math.f
 const money = (d) => "$" + (+d).toFixed(2);
 
 // ---------- router
-const LOADERS = { dash: loadDash, trips: loadTrips, charging: loadCharging, supercharging: loadSupercharging, battery: loadBattery, activity: loadActivity, settings: loadSettings };
+const LOADERS = { dash: loadDash, trips: loadTrips, charging: loadCharging, supercharging: loadSupercharging, battery: loadBattery, service: loadService, activity: loadActivity, settings: loadSettings };
 function route() {
   const v = (location.hash.slice(1) || "dash").split("?")[0];
   const view = LOADERS[v] ? v : "dash";
@@ -153,6 +153,24 @@ async function loadDash() {
     $("#whereText").textContent = s.place ? `Parked at ${s.place}` : "";
   }
   await loadTrack();
+  await loadNearby();
+}
+let nearbyLayer;
+async function loadNearby() {
+  const n = await api("api/nearby");
+  const sc = (n && n.data && n.data.superchargers) || [];
+  const fresh = n && Date.now() / 1000 - n.ts < 6 * 3600;
+  $("#nearbyPanel").style.display = sc.length ? "" : "none";
+  if (nearbyLayer) { nearbyLayer.remove(); nearbyLayer = null; }
+  if (!sc.length) return;
+  $("#nearbyAge").textContent = `(as of ${ago(n.ts)}${fresh ? "" : ", stall counts may be stale"})`;
+  $("#nearbyList").innerHTML = '<div class="nb"><span class="mute">Site</span><span class="mute">Free</span><span class="mute">Away</span>' +
+    sc.slice(0, 6).map((x) => `<span>${esc(x.name)}${x.site_closed ? ' <span class="err-t">closed</span>' : ""}</span>
+      <span class="free ${x.available_stalls ? "ok-t" : "err-t"}">${x.available_stalls ?? "?"}/${x.total_stalls ?? "?"}</span>
+      <span>${dist(x.distance_miles, 1)} ${distU()}</span>`).join("") + "</div>";
+  nearbyLayer = L.layerGroup(sc.filter((x) => x.location).map((x) => L.marker([x.location.lat, x.location.long], {
+    icon: L.divIcon({ className: "", html: '<div class="scpin"></div>', iconSize: [14, 14], iconAnchor: [7, 7] }) })
+    .bindTooltip(`${esc(x.name)} · ${x.available_stalls ?? "?"}/${x.total_stalls ?? "?"} free`))).addTo(MAP);
 }
 function openings(d) {
   const any = (o) => Object.values(o || {}).some((v) => v);
@@ -394,6 +412,53 @@ $("#scSync").addEventListener("click", async (e) => {
   catch (err) { toast(err.message); } finally { setTimeout(() => (btn.disabled = false), 6000); }
 });
 
+// ---------- alerts & service
+let SV = null, alertSev = "all";
+const SEV_CLASS = { fault: "err-t", warning: "warn-t", info: "dim" };
+async function loadService() {
+  if (!S.status) await refreshStatus();
+  SV = await api("api/service");
+  const faults = SV.alerts.filter((a) => a.severity === "fault").length;
+  $("#svcTiles").innerHTML = tile(SV.alerts.length, "car alerts saved") + tile(faults, "faults among them") +
+    tile(SV.visits.length, "service visits") + tile(usd(SV.paid_year), `paid for service in ${new Date().getFullYear()}`) + tile(usd(SV.paid_total), "paid for service in total") +
+    tile(esc((SV.software[0] || {}).version || S.status?.details?.software || "—"), SV.staged ? `software (update ${esc(SV.staged)} waiting)` : "software installed");
+  $("#alertFilters").innerHTML = ["all", "fault", "warning", "info"].map((k) =>
+    `<button class="chip ${alertSev === k ? "on" : ""}" data-sev="${k}">${k === "all" ? "All" : k[0].toUpperCase() + k.slice(1) + "s"}</button>`).join("");
+  $$("#alertFilters .chip").forEach((c) => c.addEventListener("click", () => { alertSev = c.dataset.sev; loadService(); }));
+  const al = SV.alerts.filter((a) => alertSev === "all" || a.severity === alertSev);
+  $("#alertTable").innerHTML = al.length ? `<table><thead><tr><th>When</th><th>Kind</th><th>Message</th><th>Code</th></tr></thead><tbody>` +
+    al.map((a) => `<tr><td>${dtFmt(a.ts)}</td><td><span class="pill sev ${SEV_CLASS[a.severity]}">${a.severity}</span></td>
+      <td style="white-space:normal">${esc((a.text || "").replace("/", " / ")) || '<span class="mute">(no message)</span>'}</td><td class="mono mute">${esc(a.name)}</td></tr>`).join("") + "</tbody></table>"
+    : '<div class="empty">No alerts saved yet.</div>';
+  $("#visitTable").innerHTML = SV.visits.length ? `<table><thead><tr><th>Date</th><th>Where</th><th>Type</th><th>Work done</th><th class="n">Paid</th></tr></thead><tbody>` +
+    SV.visits.map((v, i) => {
+      const w = v.work.length ? `<ul class="work">${v.work.map((x) => `<li>${esc(x.text)}<span class="pay">${esc((x.pay || "").replace("_", " "))}</span></li>`).join("")}</ul>` : '<span class="mute">details not fetched yet</span>';
+      return `<tr class="visit"><td>${esc((v.done || v.in || "").slice(0, 10))}<div class="mute">${esc(v.status || "")}</div></td><td>${esc(v.location || "—")}</td>
+        <td>${esc((v.type || "").replace("_", " "))}</td><td style="white-space:normal;min-width:360px">${w}</td>
+        <td class="n">${v.cost && v.cost.total != null ? usd(v.cost.total) : "—"}</td></tr>`;
+    }).join("") + "</tbody></table>" : '<div class="empty">No service visits.</div>';
+  const cur = SV.software[0];
+  $("#swBox").innerHTML = `<dl class="kv"><dt>Installed</dt><dd>${esc(cur?.version || S.status?.details?.software || "—")}</dd>
+      <dt>Update waiting</dt><dd>${SV.staged ? `<span class="amb-t">${esc(SV.staged)}</span>` : '<span class="dim">none</span>'}</dd></dl>
+    <h3 style="margin-top:14px">Versions seen</h3><dl class="kv">${(SV.versions_seen.length ? SV.versions_seen : SV.software.map((x) => ({ version: x.version, first: x.first_seen }))).map((v) =>
+      `<dt class="mono">${esc(v.version)}</dt><dd>${dtFmt(v.first, { day: "numeric", month: "short", year: "numeric" })}</dd>`).join("")}</dl>
+    ${cur && cur.notes.length ? `<h3 style="margin-top:14px">Release notes (${esc(cur.version)})</h3><div class="notes">${cur.notes.filter((n, i, a) =>
+      a.findIndex((m) => m.title === n.title && m.description === n.description) === i).map((n) =>
+      `<h4>${esc(n.title)}</h4>${n.subtitle ? `<p class="mute">${esc(n.subtitle)}</p>` : ""}<p>${esc(n.description || "")}</p>`).join("")}</div>` : ""}`;
+  const sd = SV.service_data && SV.service_data.data;
+  kv($("#accessKv"), [
+    ...(SV.drivers.length ? SV.drivers.map((d) => ["Shared with", `${esc([d.first, d.last].filter(Boolean).join(" ") || "—")} <span class="mute">${
+      d.access && d.access.hide_private ? "(private data hidden)" : "(full access)"}</span>`]) : [["Shared with", '<span class="dim">nobody</span>']]),
+    ["Service status", sd && Object.keys(sd).length ? esc(sd.service_status || JSON.stringify(sd)) : '<span class="ok-t">no open service visit</span>'],
+  ]);
+  $("#svcSynced").textContent = SV.last_sync ? `synced ${ago(SV.last_sync)}` : "";
+}
+$("#svcSync").addEventListener("click", async (e) => {
+  const btn = e.currentTarget; btn.disabled = true;
+  try { await api("api/action", { method: "POST", body: { action: "extras_sync" } }); toast("Syncing alerts, service and software…"); setTimeout(() => loadService().catch(() => {}), 8000); }
+  catch (err) { toast(err.message); } finally { setTimeout(() => (btn.disabled = false), 8000); }
+});
+
 // ---------- battery
 async function loadBattery() {
   if (!S.status) await refreshStatus();
@@ -416,7 +481,7 @@ $$("[data-days]").forEach((btn) => btn.addEventListener("click", () => {
 }));
 
 // ---------- activity
-const KINDS = { all: "Everything", read: "Readings", wake: "Wakes", manual: "Buttons", alert: "Alerts", mode: "Awake / asleep", supercharging: "Supercharging", settings: "Settings" };
+const KINDS = { all: "Everything", read: "Readings", wake: "Wakes", manual: "Buttons", alert: "Alerts", mode: "Awake / asleep", service: "Service", supercharging: "Supercharging", settings: "Settings" };
 async function loadActivity() {
   const ev = await api("api/activity?days=14");
   $("#actFilters").innerHTML = Object.entries(KINDS).map(([k, v]) => `<button class="chip ${S.actKind === k ? "on" : ""}" data-k="${k}">${v}</button>`).join("");
@@ -441,7 +506,7 @@ async function loadSettings() {
         html += `<div class="field"><label for="s-${s.key}">${esc(s.label)}</label><input type="number" id="s-${s.key}" data-key="${s.key}" min="${s.min}" max="${s.max}" step="any" value="${s.value}">
           ${s.help ? `<div class="help">${esc(s.help)}</div>` : ""}</div>`;
       } else if (s.kind === "flags") {
-        const names = { unlocked: "Parked & unlocked", tyre: "Low tyre", battery: "Low battery at night", budget: "Budget reached", broken: "Poller broken" };
+        const names = { unlocked: "Parked & unlocked", tyre: "Low tyre", battery: "Low battery at night", car_alert: "Car faults / service required", budget: "Budget reached", broken: "Poller broken" };
         html += `<div><div class="dim" style="margin-bottom:6px">${esc(s.label)}</div><div class="checks">` +
           Object.entries(s.value).map(([k, v]) => `<label><input type="checkbox" data-flag="${k}" ${v ? "checked" : ""}> ${esc(names[k] || k)}</label>`).join("") + "</div></div>";
       } else if (s.kind === "units") {

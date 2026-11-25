@@ -159,7 +159,14 @@ tbody tr[data-i] { cursor: pointer; }
 .feed time { color: var(--t-text-mute); font-family: var(--font-mono); font-size: var(--f-xs); padding-top: 2px; }
 .feed .k { font-size: var(--f-xs); text-transform: uppercase; letter-spacing: .06em; padding-top: 2px; }
 .k-wake, .k-manual { color: var(--t-accent); } .k-alert { color: var(--t-err-soft); } .k-read { color: var(--t-ok-soft); }
-.k-mode, .k-settings { color: var(--t-text-dim); }
+.k-mode, .k-settings, .k-service { color: var(--t-text-dim); }
+.sev { display: inline-block; min-width: 64px; text-align: center; }
+.work { margin: 6px 0 0; padding-left: 18px; color: var(--t-text-dim); font-size: var(--f-sm); white-space: normal; }
+.work li { margin: 2px 0; } .work .pay { color: var(--t-text-mute); font-size: var(--f-xs); margin-left: 6px; }
+tr.visit td { vertical-align: top; } tr.visit.open { background: var(--t-panel-hi); }
+.notes h4 { margin: 10px 0 2px; font-size: var(--f-sm); color: var(--t-text); } .notes p { margin: 0; color: var(--t-text-dim); font-size: var(--f-sm); white-space: pre-line; }
+.nb { display: grid; grid-template-columns: 1fr auto auto; gap: 4px 12px; font-size: var(--f-sm); } .nb .free { font-family: var(--font-mono); }
+.scpin { width: 14px; height: 14px; border-radius: 3px; background: #e31937; border: 2px solid var(--t-glass); box-shadow: 0 0 0 1px #e31937; }
 .filters { display: flex; gap: var(--s-2); flex-wrap: wrap; margin-bottom: var(--s-3); }
 .chip { font: inherit; font-size: var(--f-xs); padding: 3px 10px; border-radius: 99px; border: 1px solid var(--t-border-hi);
   background: transparent; color: var(--t-text-dim); cursor: pointer; }
