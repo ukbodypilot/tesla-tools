@@ -1,0 +1,13 @@
+# systemd user unit:  cp deploy/tesla-poller.service ~/.config/systemd/user/
+#                     systemctl --user daemon-reload && systemctl --user enable --now tesla-poller
+#                     loginctl enable-linger $USER   # keep it running when you are logged out
+[Unit]
+Description=tesla-tools: sleep-safe Tesla poller + web page
+
+[Service]
+ExecStart=/usr/bin/python3 -I %h/tesla-tools/tesla_service.py
+Restart=always
+RestartSec=60
+
+[Install]
+WantedBy=default.target

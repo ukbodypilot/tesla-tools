@@ -1,0 +1,24 @@
+# Copy to ~/.config/tesla/config.toml. Every setting is optional.
+# Polling intervals, the spend cap, alert thresholds, units and the home electricity rate are
+# NOT here: change them on the page's Settings tab.
+
+vin = ""                     # blank = the first car on your account
+region = "na"                # na (North America, Asia-Pacific) | eu (Europe, Middle East, Africa)
+name = ""                    # name shown on the page; blank = the car's own name
+domain = ""                  # where your public key is hosted, e.g. "you.github.io" (register_partner.py)
+redirect_uri = "http://localhost:8080/callback"   # must match the one in your Tesla developer app
+listen = "0.0.0.0:9877"      # web page + Prometheus /metrics. Use 127.0.0.1:9877 to keep it local
+public_url = ""              # how you open the page, e.g. "http://192.168.1.10:9877/" (used in emails)
+grafana_url = ""             # optional link to a Grafana dashboard
+data_dir = ""                # blank = ./data next to the code
+places_db = ""               # optional: a Family Locator famloc.db, so sessions say "Home" instead of a map link
+home_rate_label = "home"     # e.g. your utility's name, shown in the home-charging comparison
+
+[email]                      # alert emails; leave empty for none
+address = ""                 # sending account, e.g. a Gmail address
+app_password = ""            # Gmail: an app password, not your normal password
+recipient = ""               # comma-separated
+smtp_host = "smtp.gmail.com"
+smtp_port = 465
+# Or reuse another app's TOML that has email_address / email_app_password / email_recipient:
+# config_toml = "~/family-locator/data/config.toml"

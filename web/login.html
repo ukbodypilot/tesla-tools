@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tesla — sign in</title><link rel="stylesheet" href="static/app.css">
+<style>
+  .box { max-width: 360px; margin: 12vh auto; } .box form { display: grid; gap: var(--s-3); margin-top: var(--s-3); }
+</style></head>
+<body><div class="box panel">
+  <h2>Tesla</h2>
+  <p class="dim" id="msg">This page is outside your home network. Enter the Tesla page password.</p>
+  <form id="f"><input type="password" id="pw" autocomplete="current-password" placeholder="Password" required>
+    <button class="rb rb-primary" type="submit">Sign in</button></form>
+  <p class="err-t" id="err" role="alert"></p>
+</div>
+<script>
+fetch("api/status").then(r => r.json()).then(j => {
+  if (j.access === "off") {
+    document.getElementById("msg").textContent = "Remote access is off. Set a password on the Settings tab from home to use this page away from home.";
+    document.getElementById("f").style.display = "none";
+  }
+});
+document.getElementById("f").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const r = await fetch("api/login", { method: "POST", headers: { "Content-Type": "application/json", "X-Requested-With": "tesla" },
+    body: JSON.stringify({ password: document.getElementById("pw").value }) });
+  if (r.ok) location.reload();
+  else document.getElementById("err").textContent = (await r.json()).error || "Sign-in failed";
+});
+</script></body></html>

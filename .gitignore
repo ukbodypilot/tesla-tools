@@ -1,0 +1,12 @@
+# private: car history, tokens, anything local
+data/
+*.db
+*.db-*
+*.bak
+*.bak2
+*.pem
+tokens.json
+client_secret
+config.toml
+__pycache__/
+*.pyc
