@@ -33,6 +33,7 @@ DEFAULTS = {
     "places_db": "",           # optional: a Family Locator famloc.db, for place names ("Home")
     "home_rate_label": "home", # label for the home-electricity comparison, e.g. your utility's name
     "email": {},               # see config.example.toml
+    "apps": [],                # optional links to sibling apps for the header's Apps menu: [{name, url}]
 }
 
 

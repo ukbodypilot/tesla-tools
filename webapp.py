@@ -216,6 +216,7 @@ def status(c) -> dict:
         "pack_kwh": svc.PACK_KWH,
         "grafana": svc.GRAFANA_URL,
         "home_rate_label": svc.CONF["home_rate_label"],
+        "apps": svc.CONF.get("apps") or [],
     }
 
 

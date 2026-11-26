@@ -1,21 +1,22 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Tesla</title>
-<link rel="stylesheet" href="static/vendor/leaflet.css"><link rel="stylesheet" href="static/app.css">
+<link rel="stylesheet" href="static/vendor/leaflet.css"><link rel="stylesheet" href="static/rig.css"><link rel="stylesheet" href="static/app.css">
 </head>
 <body>
-<header class="top">
-  <div class="brand"><b id="carName">Tesla</b><span id="carSub"></span></div>
-  <nav class="tabs" aria-label="Tesla sections">
+<header class="rig-top">
+  <div class="rig-brand"><b id="carName">Tesla</b><small id="carSub"></small></div>
+  <nav class="rig-tabs" aria-label="Tesla sections">
     <a href="#dash" data-v="dash">Dashboard</a><a href="#trips" data-v="trips">Trips</a>
     <a href="#charging" data-v="charging">Charging</a><a href="#supercharging" data-v="supercharging">Supercharging</a><a href="#battery" data-v="battery">Battery</a><a href="#service" data-v="service">Alerts &amp; Service</a>
     <a href="#activity" data-v="activity">Activity</a><a href="#settings" data-v="settings">Settings</a>
   </nav>
-  <div class="leds" aria-live="polite">
-    <span class="led" id="ledAwake"><i></i><span>—</span></span>
-    <span class="led" id="ledLock"><i></i><span>—</span></span>
-    <span class="led" id="ledPlug"><i></i><span>—</span></span>
+  <div class="rig-side" aria-live="polite">
+    <span class="lamp" id="ledAwake"><i></i><span>—</span></span>
+    <span class="lamp" id="ledLock"><i></i><span>—</span></span>
+    <span class="lamp" id="ledPlug"><i></i><span>—</span></span>
   </div>
+  <div class="rig-apps" hidden></div>
 </header>
 
 <main>
@@ -155,5 +156,6 @@
 </main>
 <div class="toast" id="toast" role="status"></div>
 <script src="static/vendor/leaflet.js"></script>
+<script src="static/rig-apps.js"></script>
 <script src="static/app.js"></script>
 </body></html>

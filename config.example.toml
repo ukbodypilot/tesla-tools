@@ -14,6 +14,10 @@ data_dir = ""                # blank = ./data next to the code
 places_db = ""               # optional: a Family Locator famloc.db, so sessions say "Home" instead of a map link
 home_rate_label = "home"     # e.g. your utility's name, shown in the home-charging comparison
 
+# Optional "Apps" menu in the page header, linking to your other apps. Leave empty for none.
+# apps = [{ name = "Radio gateway", url = "http://192.0.2.10:8080/" },
+#         { name = "Family Locator", url = "http://192.0.2.10:8790/" }]
+
 [email]                      # alert emails; leave empty for none
 address = ""                 # sending account, e.g. a Gmail address
 app_password = ""            # Gmail: an app password, not your normal password

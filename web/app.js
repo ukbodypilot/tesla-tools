@@ -44,7 +44,7 @@ function route() {
   const view = LOADERS[v] ? v : "dash";
   S.view = view;
   $$("section.view").forEach((s) => s.classList.toggle("on", s.id === "v-" + view));
-  $$("nav.tabs a").forEach((a) => a.classList.toggle("on", a.dataset.v === view));
+  $$(".rig-tabs a").forEach((a) => a.classList.toggle("on", a.dataset.v === view));
   LOADERS[view]().catch((e) => toast(e.message));
   setTimeout(() => { for (const m of [MAP, TMAP]) if (m) m.invalidateSize(); }, 50);
 }
@@ -86,6 +86,7 @@ const carIcon = () => L.divIcon({ className: "", html: '<div class="carpin"></di
 async function refreshStatus() {
   const s = await api("api/status");
   S.status = s; S.units = s.units || S.units;
+  if (!S.appsDone) { S.appsDone = true; if (window.RigApps) RigApps.render(s.apps, "Tesla"); }
   $("#carName").textContent = s.name || "Tesla";
   const d = s.details || {};
   $("#carSub").textContent = [d.car_type === "modelx" ? "Model X" : d.car_type, d.trim, d.software].filter(Boolean).join(" · ");
@@ -99,7 +100,7 @@ async function refreshStatus() {
   $("#ledPlug").title = charging ? "Charging" : plugged ? "Plugged in" : "Not plugged in";
   return s;
 }
-function setLed(sel, cls, text) { const el = $(sel); el.className = "led " + cls; $("span", el).textContent = text; }
+function setLed(sel, cls, text) { const el = $(sel); el.className = "lamp " + (cls === "amber" ? "accent" : cls); $("span", el).textContent = text; }
 
 function kv(el, rows) {
   el.innerHTML = rows.filter((r) => r).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${v}</dd>`).join("");
