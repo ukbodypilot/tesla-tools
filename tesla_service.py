@@ -352,9 +352,11 @@ class Tesla:
         if not self.can_afford(endpoint):
             return -1, None
         self.refresh_if_needed()
+        # Tesla answers 406 (and bills it) to a request without Content-Type: application/json; POST bodies are JSON
         req = urllib.request.Request(f"{API}{full_path}", method=method,
-                                     data=b"" if method == "POST" else None,
-                                     headers={"Authorization": f"Bearer {self._tokens()['access_token']}"})
+                                     data=b"{}" if method == "POST" else None,
+                                     headers={"Authorization": f"Bearer {self._tokens()['access_token']}",
+                                              "Content-Type": "application/json"})
         try:
             with urllib.request.urlopen(req, timeout=30) as r:
                 code, body = r.status, json.loads(r.read())
@@ -460,7 +462,9 @@ class Poller:
         self.last = None               # last flattened read
         self.unlocked_alerted = False
         self.waking_since = 0.0
-        self.next_wake_ok = 0.0
+        # the 24 h wake slot survives a restart: a restart must not be a free retry of a wake that just failed
+        w = self.db.execute("SELECT MAX(ts) FROM events WHERE kind='wake' AND message LIKE 'no reading%'").fetchone()
+        self.next_wake_ok = (w[0] + STALE_WAKE_AFTER) if w and w[0] else 0.0
         self.actions: queue.Queue = queue.Queue()   # from the web app: "read" | "wake_read"
         self.kick = threading.Event()
         self.next_poll_at = 0.0

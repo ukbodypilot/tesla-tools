@@ -121,8 +121,8 @@ async function loadDash() {
     charging ? ["Charging", `${c.charger_power ?? 0} kW · ${d.charger_voltage ?? "—"} V · ${d.charger_current ?? "—"} A`] : null,
     charging && d.minutes_to_full ? ["Full in", durFmt(d.minutes_to_full * 60)] : null,
     ["Inside / outside", `${temp(c.inside_temp)} / ${temp(c.outside_temp)}`],
-    ["Climate", yesno(c.is_climate_on)],
-    ["Sentry", yesno(d.sentry)],
+    ["Climate", d.asleep_since_read ? '<span class="dim">Off</span> <span class="mute">(asleep)</span>' : yesno(c.is_climate_on)],
+    ["Sentry", d.asleep_since_read ? '<span class="dim">Off</span> <span class="mute">(asleep: Sentry would keep it awake)</span>' : yesno(d.sentry)],
     ["Odometer", `${c.odometer != null ? Number(dist(c.odometer)).toLocaleString() : "—"} ${distU()}`],
     d.update ? ["Software update", `<span class="amb-t">${esc(d.update)} ${esc(d.update_version || "")}</span>`] : null,
   ]);
@@ -200,11 +200,25 @@ $$("[data-hours]").forEach((b) => b.addEventListener("click", () => {
 async function action(kind, btn) {
   if (kind === "wake_read" && !confirm("Wake the car and read it once? This costs about 2 cents and the car stays awake for ~15 minutes.")) return;
   btn.disabled = true;
+  const label = btn.textContent, before = (S.status || {}).last_read_ts || 0;
   try {
     await api("api/action", { method: "POST", body: { action: kind } });
     toast(kind === "read" ? "Asked. If the car is awake it will be read in a few seconds; if asleep it is left alone." : "Wake sent. The car usually answers within a minute or two.");
-    setTimeout(() => loadDash().catch(() => {}), kind === "read" ? 6000 : 75000);
-  } catch (e) { toast(e.message); } finally { setTimeout(() => (btn.disabled = false), 5000); }
+    // watch for the new reading instead of guessing when it lands: the car takes anything from 20 s to a few minutes
+    const until = Date.now() + (kind === "read" ? 20000 : 6 * 60000), t0 = Date.now();
+    while (Date.now() < until) {
+      await new Promise((r) => setTimeout(r, 5000));
+      if (kind === "wake_read") btn.textContent = `Waiting for the car… ${Math.round((Date.now() - t0) / 1000)} s`;
+      const s = await refreshStatus().catch(() => null);
+      if (s && (s.last_read_ts || 0) > before) {
+        await loadDash().catch(() => {});
+        toast(`New reading at ${dtFmt(s.last_read_ts, { hour: "2-digit", minute: "2-digit" })}`);
+        return;
+      }
+    }
+    if (kind === "wake_read") toast("No reading yet: the car has not come online. The poller keeps checking for a few minutes.");
+    loadDash().catch(() => {});
+  } catch (e) { toast(e.message); } finally { btn.textContent = label; btn.disabled = false; }
 }
 $("#btnRead").addEventListener("click", (e) => action("read", e.currentTarget));
 $("#btnWake").addEventListener("click", (e) => action("wake_read", e.currentTarget));

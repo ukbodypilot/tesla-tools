@@ -168,6 +168,9 @@ def status(c) -> dict:
     last = c.execute("SELECT * FROM reads ORDER BY ts DESC LIMIT 1").fetchone()
     st = c.execute("SELECT ts, state FROM states ORDER BY ts DESC LIMIT 1").fetchone()
     car = {k: last[k] for k in last.keys() if k != "raw"} if last else {}
+    # a car that has gone to sleep since its last reading cannot be in Sentry Mode (Sentry keeps it awake), and the
+    # reading's climate is over too: say what is true now instead of showing the old reading as current
+    slept = bool(st and last and st["state"] == "asleep" and st["ts"] > last["ts"])
     api = object.__new__(svc.Tesla)   # budget helpers only need .db; use this request's connection
     api.db = c
     return {
@@ -193,7 +196,8 @@ def status(c) -> dict:
             "charger_voltage": cs.get("charger_voltage"), "charger_current": cs.get("charger_actual_current"),
             "driver_temp": cl.get("driver_temp_setting"), "cabin_overheat": cl.get("cabin_overheat_protection"),
             "seat_heater_left": cl.get("seat_heater_left"), "defrost": cl.get("is_front_defroster_on"),
-            "sentry": vs.get("sentry_mode"), "valet": vs.get("valet_mode"),
+            "sentry": False if slept else vs.get("sentry_mode"), "valet": vs.get("valet_mode"),
+            "asleep_since_read": slept,
             "speed_limit": (vs.get("speed_limit_mode") or {}).get("active"),
             "software": vs.get("car_version"),
             "update": (vs.get("software_update") or {}).get("status") or None,
