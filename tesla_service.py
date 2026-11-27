@@ -53,6 +53,8 @@ STATE_EVERY = 30 * 60        # cloud-only "asleep or online?" check (~$3/month i
 DRIVING_EVERY = 2 * 60       # car reads while in gear
 CHARGING_EVERY = 10 * 60     # car reads while charging
 PARKED_REREAD = 3 * 3600     # parked but staying awake anyway (e.g. Sentry)
+UNLOCK_CONFIRM = 3 * 60      # parked+unlocked+empty: re-read this much later before alerting. The read
+                             # that sees Park often lands before walk-away lock has locked the doors.
 STALE_WAKE_AFTER = 24 * 3600 # wake + read once if there has been no reading for this long (0 = never)
 WAKE_WAIT = 10 * 60          # give a woken car this long to come online, then give up
 ONLINE_STREAK_NEEDED = 2     # consecutive online state checks before we touch the car
@@ -391,6 +393,23 @@ def today() -> str:
 
 
 # ---------------------------------------------------------------- email alerts
+def away_link() -> str | None:
+    """The radio gateway's current short tunnel link to this page, if configured (away_link_file).
+
+    The gateway rewrites that file whenever its Cloudflare tunnel URL changes, so this is read
+    per email, never cached. Missing, unreadable or without our path: no link, no error."""
+    path = CONF.get("away_link_file")
+    if not path:
+        return None
+    try:
+        with open(path) as f:
+            links = json.load(f).get("links") or {}
+        link = links.get(CONF.get("away_link_path") or "/tesla/")
+        return link if isinstance(link, str) and link.startswith("https://") else None
+    except (OSError, ValueError, AttributeError):
+        return None
+
+
 class Mailer:
     def __init__(self, store):
         self.db = store
@@ -426,6 +445,9 @@ class Mailer:
             result = "not configured"
         else:
             link = f"\n{CONF['public_url']}" if CONF.get("public_url") else ""
+            away = away_link()
+            if away:
+                link += f"\nAway from home: {away}"
             msg = MIMEText(body + f"\n\n-- tesla-tools{link}\n", "plain", "utf-8")
             msg["From"], msg["To"] = c["email_address"], c["email_recipient"]
             msg["Subject"] = f"[Tesla] {subject}"
@@ -461,6 +483,7 @@ class Poller:
         self.read_this_wake = False
         self.last = None               # last flattened read
         self.unlocked_alerted = False
+        self.unlock_confirm_at = 0.0   # >0: an unlocked reading waits for this re-read before any alert
         self.waking_since = 0.0
         # the 24 h wake slot survives a restart: a restart must not be a free retry of a wake that just failed
         w = self.db.execute("SELECT MAX(ts) FROM events WHERE kind='wake' AND message LIKE 'no reading%'").fetchone()
@@ -545,12 +568,24 @@ class Poller:
     def check_car_alerts(self, f: dict):
         if self.mode == "parked" and f["locked"] is False and not f["is_user_present"]:
             if not self.unlocked_alerted:
-                self.unlocked_alerted = True
-                self.mail.send("unlocked", "car", "Car is parked and UNLOCKED",
-                               f"The car reported unlocked with nobody in it at "
-                               f"{time.strftime('%H:%M')}.\n{maps(f)}")
-        elif f["locked"]:
-            self.unlocked_alerted = False
+                now = time.time()
+                if not self.unlock_confirm_at:
+                    self.unlock_confirm_at = now + UNLOCK_CONFIRM
+                    self.event("unlock_check", f"Parked and unlocked with nobody in it: checking again in "
+                                               f"{UNLOCK_CONFIRM // 60} min before alerting (walk-away lock)")
+                elif now >= self.unlock_confirm_at:
+                    self.unlock_confirm_at = 0.0
+                    self.unlocked_alerted = True
+                    self.mail.send("unlocked", "car", "Car is parked and UNLOCKED",
+                                   f"The car reported unlocked with nobody in it at "
+                                   f"{time.strftime('%H:%M')}, still unlocked {UNLOCK_CONFIRM // 60} min "
+                                   f"after the first reading.\n{maps(f)}")
+        else:
+            if self.unlock_confirm_at and f["locked"]:
+                self.event("unlock_check", "Locked on the re-read: no alert")
+            self.unlock_confirm_at = 0.0
+            if f["locked"]:
+                self.unlocked_alerted = False
         tyres = {w: f[f"tpms_{w}"] for w in ("fl", "fr", "rl", "rr") if f[f"tpms_{w}"]}
         if tyres:
             top = max(tyres.values())
@@ -671,6 +706,9 @@ class Poller:
             self.next_wake_ok = time.time() + STALE_WAKE_AFTER   # no retries: next slot is 24 h on
 
         if st != "online":
+            if self.unlock_confirm_at:              # never wake the car just to confirm
+                self.unlock_confirm_at = 0.0
+                self.event("unlock_check", f"Car went {st or 'unreachable'} before the unlock re-read: no alert")
             self.streak, self.read_this_wake = 0, False
             self.set_mode("asleep" if st == "asleep" else "unknown")
             if STALE_WAKE_AFTER and stale and time.time() >= self.next_wake_ok:
@@ -696,7 +734,8 @@ class Poller:
                 self.set_mode("online")
             staying_awake = self.streak >= ONLINE_STREAK_NEEDED
             due = not self.read_this_wake or time.time() - self.last_read_ts >= PARKED_REREAD
-            if staying_awake and due:
+            confirm = self.unlock_confirm_at and time.time() >= self.unlock_confirm_at
+            if (staying_awake and due) or confirm:
                 self.read_car()
                 if self.mode == "driving":
                     return DRIVING_EVERY
@@ -738,6 +777,8 @@ class Poller:
         while True:
             try:
                 wait = self.step()
+                if self.unlock_confirm_at:          # an unlocked reading is waiting for its re-read
+                    wait = min(wait, max(30.0, self.unlock_confirm_at - time.time()))
                 failing_since = None
             except Exception as e:  # noqa: BLE001 - keep running; email if it stays broken
                 log.exception("poll failed")

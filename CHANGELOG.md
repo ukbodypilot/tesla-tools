@@ -4,6 +4,17 @@ All notable changes to tesla-tools. The version is the git tag.
 
 ## [Unreleased]
 
+- **Fix: a false "parked and UNLOCKED" alert, and a red lock lamp, right after parking.** The read
+  that sees Park can land before walk-away lock has locked the doors. An unlocked, empty, parked
+  reading now gets a second read 3 minutes later (`UNLOCK_CONFIRM`), and only a car still unlocked
+  then is alerted; a car that falls asleep first is left alone. Events log both outcomes.
+- **Lamps say how old their reading is.** Past 10 minutes, the lock lamp shows the reading's time
+  ("Unlocked 11:55") and its tooltip the full date: readings can be hours old by design.
+- **Away-from-home link in alert emails** (`away_link_file`, `away_link_path`): the radio gateway's
+  current short tunnel link to this page, read per email.
+- **Clearer "remote access is off" page.** It explains that a tunnel link counts as outside even on
+  home Wi-Fi, and where to set the password.
+
 ## [1.0.0] -- 2026-11-26
 
 First tagged release.

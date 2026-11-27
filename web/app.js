@@ -93,7 +93,13 @@ async function refreshStatus() {
   const c = s.car || {};
   const awake = s.state === "online";
   setLed("#ledAwake", s.waking ? "amber" : awake ? "ok" : s.state === "asleep" ? "sleep" : "", s.waking ? "Waking…" : awake ? (s.mode === "driving" ? "Driving" : s.mode === "charging" ? "Charging" : "Awake") : s.state === "asleep" ? "Asleep" : (s.state || "Unknown"));
-  setLed("#ledLock", c.locked === 0 || c.locked === false ? "err" : c.locked ? "ok" : "", c.locked === 0 || c.locked === false ? "Unlocked" : c.locked ? "Locked" : "Lock ?");
+  // Green = locked, red = unlocked. Readings can be hours old (the car is left to sleep), so an old
+  // one says when it was taken: "Unlocked 11:55" is a past fact, not a live door sensor.
+  const lockAge = c.ts ? (Date.now() / 1000 - c.ts) : 0;
+  const lockAt = lockAge > 10 * 60 ? " " + new Date(c.ts * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
+  const unlocked = c.locked === 0 || c.locked === false;
+  setLed("#ledLock", unlocked ? "err" : c.locked ? "ok" : "", (unlocked ? "Unlocked" : c.locked ? "Locked" : "Lock ?") + lockAt);
+  $("#ledLock").title = c.ts ? `Lock state as of the last reading, ${new Date(c.ts * 1000).toLocaleString()}` : "No reading yet";
   const plugged = c.charging_state && c.charging_state !== "Disconnected";
   const charging = ["Charging", "Starting"].includes(c.charging_state);
   setLed("#ledPlug", charging ? "amber" : plugged ? "ok" : "", charging ? "Charging" : "Plugged");

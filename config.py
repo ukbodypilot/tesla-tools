@@ -28,6 +28,8 @@ DEFAULTS = {
     "redirect_uri": "http://localhost:8080/callback",
     "listen": "0.0.0.0:9877",  # web page + /metrics
     "public_url": "",          # how you reach the page, used in links (e.g. http://192.168.1.10:9877/)
+    "away_link_file": "",      # optional: radio-gateway short-links JSON, for an "away from home" link in emails
+    "away_link_path": "/tesla/",   # which entry of that file is this page
     "grafana_url": "",         # optional link from the page header
     "data_dir": "",            # blank = <repo>/data
     "places_db": "",           # optional: a Family Locator famloc.db, for place names ("Home")
